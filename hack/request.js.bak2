@@ -1,0 +1,161 @@
+import fetch from 'node-fetch';
+import inquirer from 'inquirer';
+import ora from 'ora';
+
+async function makeRequests() {
+    const spinner = ora();
+    try {
+        // Generate email with timestamp
+        const timestamp = Date.now();
+        const email = `gbasilveira+cai42+${timestamp}@gmail.com`;
+        console.log(`\nUsing email: ${email}`);
+
+        const commonHeaders = {
+            'accept': 'text/x-component',
+            'accept-language': 'en-GB-oxendict,en;q=0.9',
+            'content-type': 'text/plain;charset=UTF-8',
+            'priority': 'u=1, i',
+            'sec-ch-ua': '"Not?A_Brand";v="99", "Chromium";v="130"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Linux"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin'
+        };
+
+        // 1. Request OTP
+        spinner.start('Requesting OTP');
+        const otpResponse = await fetch('https://cai42.pt/', {
+            method: 'POST',
+            headers: {
+                ...commonHeaders,
+                'next-action': '4464d5e6edbfc2790c122c17c40ad18f02db2bf0',
+                'next-router-state-tree': '%5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2F%22%2C%22refresh%22%5D%7D%2Cnull%2Cnull%2Ctrue%5D'
+            },
+            body: JSON.stringify([email]),
+            credentials: 'include'
+        });
+
+        // 2. Get providers
+        const providersResponse = await fetch('https://cai42.pt/api/auth/providers', {
+            headers: {
+                'accept': '*/*',
+                'content-type': 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        // 3. Get CSRF token
+        const csrfResponse = await fetch('https://cai42.pt/api/auth/csrf', {
+            headers: {
+                'accept': '*/*',
+                'content-type': 'application/json'
+            },
+            credentials: 'include'
+        });
+        const csrfData = await csrfResponse.json();
+        const csrfToken = csrfData.csrfToken;
+
+        // 4. Get OTP from user
+        const { otp } = await inquirer.prompt([{
+            type: 'input',
+            name: 'otp',
+            message: 'Enter the OTP received:',
+            validate: input => input.length === 6 && !isNaN(input)
+        }]);
+
+        // 5. Submit OTP
+        const authResponse = await fetch('https://cai42.pt/api/auth/callback/credentials?', {
+            method: 'POST',
+            headers: {
+                'accept': '*/*',
+                'content-type': 'application/x-www-form-urlencoded',
+                'x-auth-return-redirect': '1'
+            },
+            body: new URLSearchParams({
+                redirect: 'false',
+                email: email,
+                code: otp,
+                csrfToken: csrfToken,
+                callbackUrl: 'https://cai42.pt/'
+            }),
+            credentials: 'include'
+        });
+
+        const authCookies = authResponse.headers.raw()['set-cookie'];
+
+        // Wait for redirect and resource loading
+        await new Promise(r => setTimeout(r, 1000));
+
+        // Game sequence - challenge steps
+        const challenges = [
+            { id: "cm2ulzhl50000gmgzr58jf2eq", value: "1" },
+            { id: "cm2ulzhq70001gmgzno7mxfm0", value: "1" },
+            { id: "cm2ulzhth0002gmgzgt9m6lep", value: "Delta is our Guide" },
+            { id: "cm2ulzhws0003gmgzn031oo3y", value: "https://linkedin.com/in/gbasilveira" },
+            { id: "cm2ulzi050004gmgze3svttn6", value: "1" },
+            { id: "cm2ulzi3f0005gmgzxi7saf8o", value: "1" },
+            { id: "cm2ulzi6n0006gmgz6buis9he", value: "4242.pt" },
+            { id: "cm2ulzi9x0007gmgz52nzp7x0", value: "1" }
+        ];
+
+        // Custom next-action values
+        const actions = {
+            refresh: 'eeb68c8e5c70fa5d3cb8cc46fd0c9bb7c2089d69',
+            empty: 'd4eab35ad671dfb5f4df649c86319353488a9ce6',
+            challenge: '99ae8442f6a5ee32f7e7c209083660203694aca8'
+        };
+
+        for (const challenge of challenges) {
+            spinner.start(`Processing challenge ${challenge.id}`);
+
+            // 1. Refresh request
+            await fetch('https://cai42.pt/user/root', {
+                method: 'POST',
+                headers: {
+                    ...commonHeaders,
+                    'next-action': actions.refresh,
+                    'next-router-state-tree': '%5B%22%22%2C%7B%22children%22%3A%5B%22user%22%2C%7B%22children%22%3A%5B%22root%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2F%22%2C%22refresh%22%5D%7D%5D%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D'
+                },
+                body: "[]",
+                credentials: 'include'
+            });
+
+            // 2. Empty request
+            await fetch('https://cai42.pt/user/root', {
+                method: 'POST',
+                headers: {
+                    ...commonHeaders,
+                    'next-action': actions.empty,
+                    'next-router-state-tree': '%5B%22%22%2C%7B%22children%22%3A%5B%22user%22%2C%7B%22children%22%3A%5B%22root%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2F%22%2C%22refresh%22%5D%7D%5D%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D'
+                },
+                body: "[]",
+                credentials: 'include'
+            });
+
+            // 3. Challenge response
+            const challengeResponse = await fetch('https://cai42.pt/user/root', {
+                method: 'POST',
+                headers: {
+                    ...commonHeaders,
+                    'next-action': actions.challenge,
+                    'next-router-state-tree': '%5B%22%22%2C%7B%22children%22%3A%5B%22user%22%2C%7B%22children%22%3A%5B%22root%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2F%22%2C%22refresh%22%5D%7D%5D%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D'
+                },
+                body: JSON.stringify([challenge.id, challenge.value]),
+                credentials: 'include'
+            });
+
+            spinner.succeed(`Challenge ${challenge.id} completed`);
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        spinner.succeed('All challenges completed!');
+
+    } catch (error) {
+        spinner.fail('Error occurred');
+        console.error('Error details:', error);
+    }
+}
+
+// Execute the requests
+makeRequests().catch(console.error);
